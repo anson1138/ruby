@@ -1,0 +1,646 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "ElasticSearch Server Stack",
+    "Parameters": {
+        "VpcId": {
+            "Type": "String",
+            "Default": "vpc-e5ee4b8e"
+        }
+    },
+    "Resources": {
+        "MasterElasticsearchIamPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "master_elasticsearch",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "*",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "MasterElasticsearchIamRole"
+                    }
+                ]
+            }
+        },
+        "MasterElasticsearchIamRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "MasterElasticsearchIamInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "MasterElasticsearchIamRole"
+                    }
+                ]
+            }
+        },
+        "MasterElasticsearchLaunchConfiguration": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": "ami-2cd4303a",
+                "InstanceType": "m4.2xlarge",
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "VolumeSize": "100",
+                            "DeleteOnTermination": true
+                        }
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "MasterElasticsearchIamInstanceProfile"
+                },
+                "KeyName": "jobvite-ops",
+                "SecurityGroups": [
+                    {
+                        "Ref": "MasterElasticsearchEc2SecurityGroup"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster01-master-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster01-master\",\"set_domain\":\".jobvite.net\",\"ec2_worker\":true,\"sysdig\":{\"tags\":\"env:prod_cluster01,app:es-application\",\"access_key\":\"4b10e62f-9f36-46ff-b1f5-9e543b27e1f8\",\"dragent\":{\"config\":{\"customerid\":\"4b10e62f-9f36-46ff-b1f5-9e543b27e1f8\",\"tags\":\"env:prod_cluster01,app:es-application\"}}},\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"master\",\"configuration\":{\"action\":{\"destructive_requires_name\":true},\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":false},\"gateway\":{\"expected_nodes\":\"7\",\"recover_after_time\":\"15m\",\"recover_after_nodes\":\"7\"},\"cluster\":{\"name\":\"prod_es_cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"prod_es_cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"20\",\"number_of_replicas\":\"2\",\"search\":{\"slowlog\":{\"threshold\":{\"query\":{\"debug\":\"1m\"}}}}},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"marvel\":{\"history\":{\"duration\":\"7d\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
+                }
+            }
+        },
+        "MasterElasticsearchAutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Master prod-es-cluster01",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "type",
+                        "Value": "master",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "md5checksum",
+                        "Value": "854699c0accb95fb662f6d9d1eddc182",
+                        "PropagateAtLaunch": true
+                    }
+                ],
+                "MinSize": "3",
+                "MaxSize": "3",
+                "DesiredCapacity": "3",
+                "HealthCheckGracePeriod": "300",
+                "Cooldown": "10",
+                "HealthCheckType": "ELB",
+                "LaunchConfigurationName": {
+                    "Ref": "MasterElasticsearchLaunchConfiguration"
+                },
+                "VPCZoneIdentifier": [
+                    "subnet-cd0e2aa0",
+                    "subnet-b80e2ad5"
+                ]
+            }
+        },
+        "MasterSshRule0Ec2SecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "IpProtocol": "tcp",
+                "FromPort": "22",
+                "ToPort": "22",
+                "GroupId": {
+                    "Fn::GetAtt": [
+                        "MasterElasticsearchEc2SecurityGroup",
+                        "GroupId"
+                    ]
+                },
+                "CidrIp": "0.0.0.0/0"
+            }
+        },
+        "MasterElasticsearchRule0Ec2SecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "IpProtocol": "tcp",
+                "FromPort": "9200",
+                "ToPort": "9300",
+                "GroupId": {
+                    "Fn::GetAtt": [
+                        "MasterElasticsearchEc2SecurityGroup",
+                        "GroupId"
+                    ]
+                },
+                "CidrIp": "0.0.0.0/0"
+            }
+        },
+        "MasterElasticsearchEc2SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Elasticsearch Server Stack Security Group",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Master prod-es-cluster01"
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01"
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "DataNodeElasticsearchIamPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "data_elasticsearch",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "*",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "DataNodeElasticsearchIamRole"
+                    }
+                ]
+            }
+        },
+        "DataNodeElasticsearchIamRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "DataNodeElasticsearchIamInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "DataNodeElasticsearchIamRole"
+                    }
+                ]
+            }
+        },
+        "DataNodeElasticsearchLaunchConfiguration": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": "ami-2cd4303a",
+                "InstanceType": "m4.4xlarge",
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "VolumeSize": "100",
+                            "DeleteOnTermination": true
+                        }
+                    },
+                    {
+                        "DeviceName": "/dev/sdf",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "VolumeSize": "750",
+                            "Encrypted": true,
+                            "DeleteOnTermination": true
+                        }
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "DataNodeElasticsearchIamInstanceProfile"
+                },
+                "KeyName": "jobvite-ops",
+                "SecurityGroups": [
+                    {
+                        "Ref": "DataNodeElasticsearchEc2SecurityGroup"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster01-data-node-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster01-data-node\",\"set_domain\":null,\"ec2_worker\":true,\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"data\",\"configuration\":{\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":true},\"http\":{\"enabled\":true},\"cluster\":{\"name\":\"prod_es_cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"cloud\":{\"node\":{\"auto_attributes\":true}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"prod_es_cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"20\",\"number_of_replicas\":\"2\",\"search\":{\"slowlog\":{\"threshold\":{\"query\":{\"debug\":\"1m\"}}}}},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
+                }
+            }
+        },
+        "DataNodeElasticsearchAutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Data Node prod-es-cluster01",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "type",
+                        "Value": "datanode",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "md5checksum",
+                        "Value": "854699c0accb95fb662f6d9d1eddc182",
+                        "PropagateAtLaunch": true
+                    }
+                ],
+                "MinSize": "6",
+                "MaxSize": "6",
+                "DesiredCapacity": "6",
+                "HealthCheckGracePeriod": "300",
+                "Cooldown": "10",
+                "HealthCheckType": "ELB",
+                "LaunchConfigurationName": {
+                    "Ref": "DataNodeElasticsearchLaunchConfiguration"
+                },
+                "VPCZoneIdentifier": [
+                    "subnet-cd0e2aa0",
+                    "subnet-b80e2ad5"
+                ]
+            }
+        },
+        "DataNodeSshRule0Ec2SecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "IpProtocol": "tcp",
+                "FromPort": "22",
+                "ToPort": "22",
+                "GroupId": {
+                    "Fn::GetAtt": [
+                        "DataNodeElasticsearchEc2SecurityGroup",
+                        "GroupId"
+                    ]
+                },
+                "CidrIp": "0.0.0.0/0"
+            }
+        },
+        "DataNodeElasticsearchRule0Ec2SecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "IpProtocol": "tcp",
+                "FromPort": "9200",
+                "ToPort": "9300",
+                "GroupId": {
+                    "Fn::GetAtt": [
+                        "DataNodeElasticsearchEc2SecurityGroup",
+                        "GroupId"
+                    ]
+                },
+                "CidrIp": "0.0.0.0/0"
+            }
+        },
+        "DataNodeElasticsearchEc2SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Elasticsearch Server Stack Security Group",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Data Node prod-es-cluster01"
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01"
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "ClientNodeElasticsearchIamPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Properties": {
+                "PolicyName": "client_elasticsearch",
+                "PolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "*",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "ClientNodeElasticsearchIamRole"
+                    }
+                ]
+            }
+        },
+        "ClientNodeElasticsearchIamRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "ClientNodeElasticsearchIamInstanceProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "ClientNodeElasticsearchIamRole"
+                    }
+                ]
+            }
+        },
+        "ClientNodeElasticsearchLaunchConfiguration": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": "ami-2cd4303a",
+                "InstanceType": "m4.large",
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "VolumeSize": "100",
+                            "DeleteOnTermination": true
+                        }
+                    },
+                    {
+                        "DeviceName": "/dev/sdf",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "VolumeSize": "50",
+                            "Encrypted": true,
+                            "DeleteOnTermination": true
+                        }
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "ClientNodeElasticsearchIamInstanceProfile"
+                },
+                "KeyName": "jobvite-ops",
+                "SecurityGroups": [
+                    {
+                        "Ref": "ClientNodeElasticsearchEc2SecurityGroup"
+                    }
+                ],
+                "UserData": {
+                    "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster-01client-node-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster-01client-node\",\"set_domain\":null,\"ec2_worker\":true,\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"client\",\"configuration\":{\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":false},\"http\":{\"enabled\":true},\"cluster\":{\"name\":\"prod_es_cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"cloud\":{\"node\":{\"auto_attributes\":true}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"prod_es_cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"0\",\"number_of_replicas\":\"0\"},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
+                }
+            }
+        },
+        "ClientNodeElasticsearchAutoScalingGroup": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Client Node prod-es-cluster01",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "type",
+                        "Value": "clientnode",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod",
+                        "PropagateAtLaunch": true
+                    },
+                    {
+                        "Key": "md5checksum",
+                        "Value": "854699c0accb95fb662f6d9d1eddc182",
+                        "PropagateAtLaunch": true
+                    }
+                ],
+                "MinSize": "2",
+                "MaxSize": "2",
+                "DesiredCapacity": "2",
+                "HealthCheckGracePeriod": "300",
+                "Cooldown": "10",
+                "HealthCheckType": "ELB",
+                "LoadBalancerNames": [
+                    {
+                        "Ref": "ClientNodeElasticsearchLoadBalancer"
+                    }
+                ],
+                "LaunchConfigurationName": {
+                    "Ref": "ClientNodeElasticsearchLaunchConfiguration"
+                },
+                "VPCZoneIdentifier": [
+                    "subnet-cd0e2aa0",
+                    "subnet-b80e2ad5"
+                ]
+            }
+        },
+        "ClientNodeSshRule0Ec2SecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "IpProtocol": "tcp",
+                "FromPort": "22",
+                "ToPort": "22",
+                "GroupId": {
+                    "Fn::GetAtt": [
+                        "ClientNodeElasticsearchEc2SecurityGroup",
+                        "GroupId"
+                    ]
+                },
+                "CidrIp": "0.0.0.0/0"
+            }
+        },
+        "ClientNodeElasticsearchRule0Ec2SecurityGroupIngress": {
+            "Type": "AWS::EC2::SecurityGroupIngress",
+            "Properties": {
+                "IpProtocol": "tcp",
+                "FromPort": "9200",
+                "ToPort": "9300",
+                "GroupId": {
+                    "Fn::GetAtt": [
+                        "ClientNodeElasticsearchEc2SecurityGroup",
+                        "GroupId"
+                    ]
+                },
+                "CidrIp": "0.0.0.0/0"
+            }
+        },
+        "ClientNodeElasticsearchEc2SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Elasticsearch Server Stack Security Group",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Client Node prod-es-cluster01"
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01"
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod"
+                    }
+                ],
+                "VpcId": {
+                    "Ref": "VpcId"
+                }
+            }
+        },
+        "ClientNodeElasticsearchLoadBalancer": {
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties": {
+                "SecurityGroups": [
+                    {
+                        "Ref": "ClientNodeElasticsearchEc2SecurityGroup"
+                    }
+                ],
+                "Scheme": "internal",
+                "Subnets": [
+                    "subnet-cd0e2aa0",
+                    "subnet-b80e2ad5"
+                ],
+                "HealthCheck": {
+                    "HealthyThreshold": "2",
+                    "Interval": "60",
+                    "Timeout": "10",
+                    "Target": "TCP:22",
+                    "UnhealthyThreshold": "10"
+                },
+                "Listeners": [
+                    {
+                        "LoadBalancerPort": "9300",
+                        "InstancePort": "9300",
+                        "InstanceProtocol": "TCP",
+                        "Protocol": "TCP"
+                    },
+                    {
+                        "LoadBalancerPort": "9200",
+                        "InstancePort": "9200",
+                        "InstanceProtocol": "TCP",
+                        "Protocol": "TCP"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "ElasticSearch Client Node prod-es-cluster01"
+                    },
+                    {
+                        "Key": "app",
+                        "Value": "prod_es_cluster01"
+                    },
+                    {
+                        "Key": "env",
+                        "Value": "prod"
+                    }
+                ]
+            }
+        },
+        "ClientNodeElasticsearchRoute53RecordSet": {
+            "Type": "AWS::Route53::RecordSet",
+            "Properties": {
+                "Name": "prod-es-cluster01-clientnode.jobvite.net",
+                "ResourceRecords": [
+                    {
+                        "Fn::GetAtt": [
+                            "ClientNodeElasticsearchLoadBalancer",
+                            "DNSName"
+                        ]
+                    }
+                ],
+                "TTL": 300,
+                "Type": "CNAME",
+                "Comment": "cname for prod-es-cluster01-clientnode elb",
+                "HostedZoneId": "ZXUOUQXVVFDAO"
+            }
+        }
+    }
+}

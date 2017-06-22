@@ -1,0 +1,429 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "my_ecs.rb: ECS Test Cluster Anson qa",
+  "Resources": {
+    "EcsansontestEcsCluster": {
+      "Type": "AWS::ECS::Cluster",
+      "Properties": {
+        "ClusterName": "anson_ecs"
+      }
+    },
+    "EcsansontestEcsServiceIamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ecs.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceRole"
+        ],
+        "Path": "/"
+      }
+    },
+    "EcsansontestIamInstanceProfile": {
+      "Type": "AWS::IAM::InstanceProfile",
+      "Properties": {
+        "Path": "/",
+        "Roles": [
+          {
+            "Ref": "EcsansontestEcsforEc2IamRole"
+          }
+        ]
+      }
+    },
+    "EcsansontestElasticLoadBalancingV2LoadBalancer": {
+      "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+      "Properties": {
+        "Scheme": "internal",
+        "LoadBalancerAttributes": [
+          {
+            "Key": "access_logs.s3.enabled",
+            "Value": "true"
+          },
+          {
+            "Key": "access_logs.s3.bucket",
+            "Value": "jobvite-elb-logs"
+          },
+          {
+            "Key": "access_logs.s3.prefix",
+            "Value": "dev/ecs_anson/access-logs"
+          },
+          {
+            "Key": "idle_timeout.timeout_seconds",
+            "Value": "900"
+          }
+        ],
+        "SecurityGroups": [
+          "sg-1ffcea61"
+        ],
+        "Subnets": [
+          "subnet-fe9cb289",
+          "subnet-f24606ab"
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ECS anson teset"
+          },
+          {
+            "Key": "env",
+            "Value": "dev"
+          },
+          {
+            "Key": "app",
+            "Value": "ecs_test_anson"
+          },
+          {
+            "Key": "owner",
+            "Value": "anson.kee"
+          }
+        ]
+      }
+    },
+    "EcsansontestElasticLoadBalancingV2Listener": {
+      "Type": "AWS::ElasticLoadBalancingV2::Listener",
+      "Properties": {
+        "DefaultActions": [
+          {
+            "TargetGroupArn": {
+              "Ref": "EcsansontestElasticLoadBalancingV2TargetGroup"
+            },
+            "Type": "forward"
+          }
+        ],
+        "LoadBalancerArn": {
+          "Ref": "EcsansontestElasticLoadBalancingV2LoadBalancer"
+        },
+        "Port": "80",
+        "Protocol": "HTTP"
+      }
+    },
+    "EcsansontestElasticLoadBalancingV2ListenerRule": {
+      "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+      "Properties": {
+        "Actions": [
+          {
+            "TargetGroupArn": {
+              "Ref": "EcsansontestElasticLoadBalancingV2TargetGroup"
+            },
+            "Type": "forward"
+          }
+        ],
+        "Conditions": [
+          {
+            "Field": "path-pattern",
+            "Values": [
+              "/"
+            ]
+          }
+        ],
+        "ListenerArn": {
+          "Ref": "EcsansontestElasticLoadBalancingV2Listener"
+        },
+        "Priority": 1
+      }
+    },
+    "EcsansontestElasticLoadBalancingV2TargetGroup": {
+      "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+      "Properties": {
+        "HealthCheckIntervalSeconds": "60",
+        "HealthCheckPath": "/",
+        "HealthCheckTimeoutSeconds": "59",
+        "HealthyThresholdCount": "2",
+        "Matcher": {
+          "HttpCode": "200"
+        },
+        "Name": "anson-targetgroup-webapptest2",
+        "Port": "5000",
+        "Protocol": "HTTP",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ECS anson teset"
+          },
+          {
+            "Key": "env",
+            "Value": "dev"
+          },
+          {
+            "Key": "app",
+            "Value": "ecs_test_anson"
+          },
+          {
+            "Key": "owner",
+            "Value": "anson.kee"
+          }
+        ],
+        "TargetGroupAttributes": [
+          {
+            "Key": "deregistration_delay.timeout_seconds",
+            "Value": "60"
+          }
+        ],
+        "UnhealthyThresholdCount": "10",
+        "VpcId": "vpc-91b20ff4"
+      }
+    },
+    "EcsansontestRoute53RecordSet": {
+      "Type": "AWS::Route53::RecordSet",
+      "Properties": {
+        "Name": "ecsansontest.qa.jobvite.net",
+        "ResourceRecords": [
+          {
+            "Fn::GetAtt": [
+              "EcsansontestElasticLoadBalancingV2LoadBalancer",
+              "DNSName"
+            ]
+          }
+        ],
+        "TTL": "300",
+        "Type": "CNAME",
+        "Comment": "CNAME for anson ecs test ALB",
+        "HostedZoneName": "qa.jobvite.net."
+      }
+    },
+    "EcsansontestEcsforEc2IamRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": [
+                  "ec2.amazonaws.com"
+                ]
+              },
+              "Action": [
+                "sts:AssumeRole"
+              ]
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+        ],
+        "Path": "/"
+      }
+    },
+    "EcsansontestAutoScalingGroup": {
+      "Type": "AWS::AutoScaling::AutoScalingGroup",
+      "Properties": {
+        "DesiredCapacity": "5",
+        "MaxSize": "5",
+        "MinSize": "5",
+        "HealthCheckGracePeriod": "300",
+        "HealthCheckType": "EC2",
+        "LaunchConfigurationName": {
+          "Ref": "EcsansontestLaunchConfiguration"
+        },
+        "TargetGroupARNs": [
+          {
+            "Ref": "EcsansontestElasticLoadBalancingV2TargetGroup"
+          }
+        ],
+        "VPCZoneIdentifier": [
+          "subnet-fe9cb289",
+          "subnet-f24606ab"
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ECS anson test",
+            "PropagateAtLaunch": true
+          },
+          {
+            "Key": "env",
+            "Value": "dev",
+            "PropagateAtLaunch": true
+          },
+          {
+            "Key": "app",
+            "Value": "ecs_test_anson",
+            "PropagateAtLaunch": true
+          },
+          {
+            "Key": "owner",
+            "Value": "anson.kee",
+            "PropagateAtLaunch": true
+          }
+        ]
+      },
+      "DependsOn": "EcsansontestElasticLoadBalancingV2LoadBalancer"
+    },
+    "EcsansontestLaunchConfiguration": {
+      "Type": "AWS::AutoScaling::LaunchConfiguration",
+      "Properties": {
+        "AssociatePublicIpAddress": false,
+        "SecurityGroups": [
+          "sg-1ffcea61"
+        ],
+        "ImageId": "ami-275ffe31",
+        "IamInstanceProfile": {
+          "Ref": "EcsansontestIamInstanceProfile"
+        },
+        "InstanceType": "t2.small",
+        "KeyName": "jobvite-dev",
+        "UserData": {
+          "Fn::Base64": "#!/bin/bash -e\necho ECS_CLUSTER=anson_ecs > /etc/ecs/ecs.config\n"
+        }
+      }
+    },
+    "EcsansontestEcsTaskDefinition": {
+      "Type": "AWS::ECS::TaskDefinition",
+      "Properties": {
+        "ContainerDefinitions": [
+          {
+            "Name": "pythonwebapp",
+            "Command": [
+              "python",
+              "app.py"
+            ],
+            "Image": "training/webapp:latest",
+            "Memory": 128,
+            "PortMappings": [
+              {
+                "ContainerPort": 5000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "EcsansontestEcsService": {
+      "Type": "AWS::ECS::Service",
+      "Properties": {
+        "Cluster": {
+          "Ref": "EcsansontestEcsCluster"
+        },
+        "DesiredCount": 5,
+        "LoadBalancers": [
+          {
+            "ContainerName": "pythonwebapp",
+            "ContainerPort": 5000,
+            "TargetGroupArn": {
+              "Ref": "EcsansontestElasticLoadBalancingV2TargetGroup"
+            }
+          }
+        ],
+        "Role": {
+          "Ref": "EcsansontestEcsServiceIamRole"
+        },
+        "ServiceName": "pythonwebapp_service",
+        "TaskDefinition": {
+          "Ref": "EcsansontestEcsTaskDefinition"
+        }
+      },
+      "DependsOn": "EcsansontestAutoScalingGroup"
+    }
+  },
+  "Outputs": {
+    "ApplicationLoadBalancerArn": {
+      "Description": "application load balancer arn",
+      "Value": {
+        "Ref": "EcsansontestElasticLoadBalancingV2LoadBalancer"
+      }
+    },
+    "ApplicationLoadBalancerDnsName": {
+      "Description": "application load balancer dns name",
+      "Value": {
+        "Fn::GetAtt": [
+          "EcsansontestElasticLoadBalancingV2LoadBalancer",
+          "DNSName"
+        ]
+      }
+    },
+    "ApplicationLoadBalancerFullName": {
+      "Description": "application load balancer full name",
+      "Value": {
+        "Fn::GetAtt": [
+          "EcsansontestElasticLoadBalancingV2LoadBalancer",
+          "LoadBalancerFullName"
+        ]
+      }
+    },
+    "ApplicationLoadBalancerName": {
+      "Description": "application load balancer name",
+      "Value": {
+        "Fn::GetAtt": [
+          "EcsansontestElasticLoadBalancingV2LoadBalancer",
+          "LoadBalancerName"
+        ]
+      }
+    },
+    "ApplicationLoadBalancerTargetGroupsArn": {
+      "Description": "application load balancer target group arn",
+      "Value": {
+        "Ref": "EcsansontestElasticLoadBalancingV2TargetGroup"
+      }
+    },
+    "ApplicationLoadBalancerTargetGroupsFullName": {
+      "Description": "application load balancer target group full name",
+      "Value": {
+        "Fn::GetAtt": [
+          "EcsansontestElasticLoadBalancingV2TargetGroup",
+          "TargetGroupFullName"
+        ]
+      }
+    },
+    "ApplicationLoadBalancerListenerArn": {
+      "Description": "application load balancer listener arn",
+      "Value": {
+        "Ref": "EcsansontestElasticLoadBalancingV2Listener"
+      }
+    },
+    "ApplicationLoadBalancerListenerRuleArn": {
+      "Description": "application load balancer listener rule arn",
+      "Value": {
+        "Ref": "EcsansontestElasticLoadBalancingV2ListenerRule"
+      }
+    },
+    "Route53DomainName": {
+      "Description": "Route 53 domain name",
+      "Value": {
+        "Ref": "EcsansontestRoute53RecordSet"
+      }
+    },
+    "ClusterName": {
+      "Description": "ecs cluster name",
+      "Value": {
+        "Ref": "EcsansontestEcsCluster"
+      }
+    },
+    "TaskDefinitionArn": {
+      "Description": "ecs task definition arn",
+      "Value": {
+        "Ref": "EcsansontestEcsTaskDefinition"
+      }
+    },
+    "ServicenameArn": {
+      "Description": "ecs service arn",
+      "Value": {
+        "Ref": "EcsansontestEcsService"
+      }
+    },
+    "ServicenameName": {
+      "Description": "ecs service name",
+      "Value": {
+        "Fn::GetAtt": [
+          "EcsansontestEcsService",
+          "Name"
+        ]
+      }
+    }
+  }
+}

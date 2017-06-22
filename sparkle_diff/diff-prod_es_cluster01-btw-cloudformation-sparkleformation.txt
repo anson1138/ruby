@@ -1,0 +1,138 @@
+diff --git 1/elasticsearchProdCluster01-sparkle.json 2/elasticsearchProdCluster01-cloudformation.json
+index 2daa424..e927f9d 100644
+--- 1/elasticsearchProdCluster01-sparkle.json
++++ 2/elasticsearchProdCluster01-cloudformation.json
+@@ -87,7 +87,7 @@
+                     }
+                 ],
+                 "UserData": {
+-          "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster01-master-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster01-master\",\"set_domain\":\".jobvite.net\",\"ec2_worker\":true,\"sysdig\":{\"tags\":\"env:prod_cluster01,app:es-application\",\"access_key\":\"4b10e62f-9f36-46ff-b1f5-9e543b27e1f8\",\"dragent\":{\"config\":{\"customerid\":\"4b10e62f-9f36-46ff-b1f5-9e543b27e1f8\",\"tags\":\"env:prod_cluster01,app:es-application\"}}},\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"master\",\"configuration\":{\"action\":{\"destructive_requires_name\":true},\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":false},\"gateway\":{\"expected_nodes\":\"7\",\"recover_after_time\":\"15m\",\"recover_after_nodes\":\"7\"},\"cluster\":{\"name\":\"elasticsearch-cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"elasticsearch-cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"20\",\"number_of_replicas\":\"2\",\"search\":{\"slowlog\":{\"threshold\":{\"query\":{\"debug\":\"1m\"}}}}},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"marvel\":{\"history\":{\"duration\":\"7d\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
++                    "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster01-master-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster01-master\",\"set_domain\":\".jobvite.net\",\"ec2_worker\":true,\"sysdig\":{\"tags\":\"env:prod_cluster01,app:es-application\",\"access_key\":\"4b10e62f-9f36-46ff-b1f5-9e543b27e1f8\",\"dragent\":{\"config\":{\"customerid\":\"4b10e62f-9f36-46ff-b1f5-9e543b27e1f8\",\"tags\":\"env:prod_cluster01,app:es-application\"}}},\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"master\",\"configuration\":{\"action\":{\"destructive_requires_name\":true},\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":false},\"gateway\":{\"expected_nodes\":\"7\",\"recover_after_time\":\"15m\",\"recover_after_nodes\":\"7\"},\"cluster\":{\"name\":\"prod_es_cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"prod_es_cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"20\",\"number_of_replicas\":\"2\",\"search\":{\"slowlog\":{\"threshold\":{\"query\":{\"debug\":\"1m\"}}}}},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"marvel\":{\"history\":{\"duration\":\"7d\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
+                 }
+             }
+         },
+@@ -102,7 +102,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01",
++                        "Value": "prod_es_cluster01",
+                         "PropagateAtLaunch": true
+                     },
+                     {
+@@ -166,21 +166,6 @@
+                 "CidrIp": "0.0.0.0/0"
+             }
+         },
+-    "Kibana0Ec2SecurityGroupIngress": {
+-      "Type": "AWS::EC2::SecurityGroupIngress",
+-      "Properties": {
+-        "IpProtocol": "tcp",
+-        "FromPort": "80",
+-        "ToPort": "80",
+-        "GroupId": {
+-          "Fn::GetAtt": [
+-            "MasterElasticsearchEc2SecurityGroup",
+-            "GroupId"
+-          ]
+-        },
+-        "CidrIp": "0.0.0.0/0"
+-      }
+-    },
+         "MasterElasticsearchEc2SecurityGroup": {
+             "Type": "AWS::EC2::SecurityGroup",
+             "Properties": {
+@@ -192,7 +177,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01"
++                        "Value": "prod_es_cluster01"
+                     },
+                     {
+                         "Key": "env",
+@@ -292,7 +277,7 @@
+                     }
+                 ],
+                 "UserData": {
+-          "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster01-data-node-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster01-data-node\",\"set_domain\":null,\"ec2_worker\":true,\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"data\",\"configuration\":{\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":true},\"http\":{\"enabled\":true},\"cluster\":{\"name\":\"elasticsearch-cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"cloud\":{\"node\":{\"auto_attributes\":true}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"elasticsearch-cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"20\",\"number_of_replicas\":\"2\",\"search\":{\"slowlog\":{\"threshold\":{\"query\":{\"debug\":\"1m\"}}}}},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
++                    "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster01-data-node-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster01-data-node\",\"set_domain\":null,\"ec2_worker\":true,\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"data\",\"configuration\":{\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":true},\"http\":{\"enabled\":true},\"cluster\":{\"name\":\"prod_es_cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"cloud\":{\"node\":{\"auto_attributes\":true}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"prod_es_cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"20\",\"number_of_replicas\":\"2\",\"search\":{\"slowlog\":{\"threshold\":{\"query\":{\"debug\":\"1m\"}}}}},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
+                 }
+             }
+         },
+@@ -307,7 +292,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01",
++                        "Value": "prod_es_cluster01",
+                         "PropagateAtLaunch": true
+                     },
+                     {
+@@ -382,7 +367,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01"
++                        "Value": "prod_es_cluster01"
+                     },
+                     {
+                         "Key": "env",
+@@ -482,7 +467,7 @@
+                     }
+                 ],
+                 "UserData": {
+-          "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster-01client-node-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster-01client-node\",\"set_domain\":null,\"ec2_worker\":true,\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"client\",\"configuration\":{\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":false,\"data\":false},\"http\":{\"enabled\":true},\"cluster\":{\"name\":\"elasticsearch-cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"cloud\":{\"node\":{\"auto_attributes\":true}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"elasticsearch-cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"0\",\"number_of_replicas\":\"0\"},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
++                    "Fn::Base64": "#!/bin/bash\n# Remove client.pem for a clean registration\nrm -rf /etc/chef/client.pem\n# remove old hostname script in case it still exists.  this will be removed when old hostname script is removed from jobvite_base\nservice hostname stop\nrm -rf /opt/jobvite/wrappers/hostname.rb\nrm -rf /etc/init.d/hostname\nexport INSTANCEID=$(curl http://169.254.169.254/latest/meta-data/instance-id)\nexport AZ=$(curl http://169.254.169.254/latest/meta-data/placement/availability-zone)\nexport NAME=$AZ-es-cluster-01client-node-$INSTANCEID\nhostname $NAME\ncat << EOFF > /etc/chef/run.json\n{\"run_list\":[\"jobvite_elasticsearch_node\"],\"set_hostname\":\"es-cluster-01client-node\",\"set_domain\":null,\"ec2_worker\":true,\"elasticsearch\":{\"targz\":\"https://download.elastic.co/elasticsearch/release/org/elasticsearch/distribution/tar/elasticsearch/2.3.5/elasticsearch-2.3.5.tar.gz\",\"type\":\"client\",\"configuration\":{\"network\":{\"host\":\"_site_\"},\"node\":{\"master\":true,\"data\":false},\"http\":{\"enabled\":true},\"cluster\":{\"name\":\"prod_es_cluster01\",\"routing\":{\"allocation\":{\"same_shard\":{\"host\":false}}}},\"cloud\":{\"node\":{\"auto_attributes\":true}},\"path\":{\"data\":\"/opt/elasticsearch/deployed/data\",\"logs\":\"/opt/elasticsearch/deployed/logs\",\"plugins\":\"/opt/elasticsearch/deployed/plugins\"},\"discovery\":{\"type\":\"ec2\",\"ec2\":{\"tag\":{\"env\":\"prod\",\"app\":\"prod_es_cluster01\",\"md5checksum\":\"854699c0accb95fb662f6d9d1eddc182\"}},\"zen\":{\"ping\":{\"multicast\":{\"enabled\":false}},\"minimum_master_nodes\":\"2\"}},\"bootstrap\":{\"mlockall\":true},\"index\":{\"number_of_shards\":\"0\",\"number_of_replicas\":\"0\"},\"indices\":{\"fielddata\":{\"cache\":{\"size\":\"30%\"}},\"recovery\":{\"max_bytes_per_sec\":\"100mb\"}},\"environment_type\":\"prod\"}}}\nEOFF\nchef-client -j /etc/chef/run.json\n"
+                 }
+             }
+         },
+@@ -497,7 +482,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01",
++                        "Value": "prod_es_cluster01",
+                         "PropagateAtLaunch": true
+                     },
+                     {
+@@ -577,7 +562,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01"
++                        "Value": "prod_es_cluster01"
+                     },
+                     {
+                         "Key": "env",
+@@ -606,7 +591,7 @@
+                     "HealthyThreshold": "2",
+                     "Interval": "60",
+                     "Timeout": "10",
+-          "Target": "TCP:9300",
++                    "Target": "TCP:22",
+                     "UnhealthyThreshold": "10"
+                 },
+                 "Listeners": [
+@@ -621,12 +606,6 @@
+                         "InstancePort": "9200",
+                         "InstanceProtocol": "TCP",
+                         "Protocol": "TCP"
+-          },
+-          {
+-            "LoadBalancerPort": "80",
+-            "InstancePort": "80",
+-            "InstanceProtocol": "HTTP",
+-            "Protocol": "HTTP"
+                     }
+                 ],
+                 "Tags": [
+@@ -636,7 +615,7 @@
+                     },
+                     {
+                         "Key": "app",
+-            "Value": "elasticsearch-cluster01"
++                        "Value": "prod_es_cluster01"
+                     },
+                     {
+                         "Key": "env",
