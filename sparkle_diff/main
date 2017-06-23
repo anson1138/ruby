@@ -1,21 +1,14 @@
+#!/usr/bin/ruby
 require 'aws-sdk'
 require 'json'
 require 'pp'
-# get cloudformation stack and output to file
-#
-# sfn print to file
-#
-# diff both files ignore white space
-#
-
 
 class SparkleDiffInteractor
   def initialize(context)
     @component = context[:component]
-    @stack_name = context[:stack_name]
+    @stack_template_name = context[:stack_template_name]
     @provisioner_component = get_component_factory
     @sparkle_shared_entity = get_shared_entity_factory
-
   end
 
   def get_template
@@ -29,7 +22,7 @@ class SparkleDiffInteractor
   def write_template_to_file
     content = convert_template_to_pretty_json
     @sparkle_shared_entity.write_to_file({
-      :path => "#{@component}_#{@stack_name}",
+      :path => "#{@component}_#{@stack_template_name}",
       :content => content
     })
   end
@@ -37,7 +30,7 @@ class SparkleDiffInteractor
   def get_component_factory
     CloudTemplateFactory.new({
       :component => @component,
-      :stack_name => @stack_name
+      :stack_template_name => @stack_template_name
     }).create_factory
   end
 
@@ -46,23 +39,20 @@ class SparkleDiffInteractor
       :component => "shared_entity"
     }).create_factory
   end
-
 end
 
 class CloudTemplateFactory
   def initialize(spec)
     @component = spec[:component]
-    @stack_name = spec[:stack_name]
-    @stack_filename = spec[:stack_filename]
-    puts @stack_filename
+    @stack_template_name = spec[:stack_template_name]
   end
 
   def create_factory
     case @component
     when "cloudformation"
-      CloudFormationTemplate.new(@stack_name)
+      CloudFormationTemplate.new(@stack_template_name)
     when "sparkle"
-      SparkeFormationTemplate.new(@stack_filename)
+      SparkeFormationTemplate.new(@stack_template_name)
     when "shared_entity"
       SparkleSharedEntity.new
     end
@@ -70,14 +60,15 @@ class CloudTemplateFactory
 end
 
 class CloudFormationTemplate
-  def initialize(stack_name)
+  def initialize(stack_template_name)
     @sparkle_shared_entity = CloudTemplateFactory.new({:component => "shared_entity"}).create_factory
-    @stack_name = stack_name
+    @stack_template_name = stack_template_name
   end
 
   def get_template
+    puts "in cloudformation template: #{@stack_template_name}"
     client = @sparkle_shared_entity.get_cloudformation_client
-    resp = client.get_template({stack_name: @stack_name})
+    resp = client.get_template({stack_name: @stack_template_name})
     content = resp.template_body
   end
 end
@@ -102,32 +93,32 @@ class SparkleSharedEntity
 end
 
 class SparkeFormationTemplate
-  def initialize(stack_filename)
+  def initialize(stack_template_name)
     @sparkle_shared_entity = CloudTemplateFactory.new(:component => "shared_entity").create_factory
-    @stack_filename = stack_filename
+    @stack_template_name = stack_template_name
   end
 
   def get_template
-    puts @stack_filename
-    resp = `cat #{@stack_filename}`
-    puts resp
+    resp = `sfn print --file #{@stack_template_name}`
     return resp
   end
 end
 
-
 def main
-  stack_filename = ARGV[0]
-  puts stack_filename
+  stack_file_name = ARGV[0]
+  stack_name = ARGV[1]
+  puts stack_file_name
+  puts stack_name
   cloudformation_template = SparkleDiffInteractor.new({
     :component => "cloudformation",
-    :stack_name => "ansonECSTest2"
+    :stack_template_name => stack_name
+    #:stack_template_name => "ansonECSTest2"
   }).write_template_to_file
 
   sparkleformation_template = SparkleDiffInteractor.new({
     :component => "sparkle",
-    :stack_filename => stack_filename
-  }).get_template
+    :stack_template_name => stack_file_name
+  }).write_template_to_file
 end
 
 main
